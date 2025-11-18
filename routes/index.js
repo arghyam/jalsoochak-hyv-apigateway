@@ -6,6 +6,7 @@ const CircuitBreaker = require("opossum");
 const router = express.Router();
 const { log } = require("../utils/logger");
 const { apiKeyAuth } = require("../middlewares/apiKeyAuth");
+const { readingRateLimiter } = require("../middlewares/rateLimiter");
 
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
 const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
@@ -40,14 +41,14 @@ breaker.on("open", () => log("Circuit breaker opened"));
 breaker.on("halfOpen", () => log("Circuit breaker half-open"));
 breaker.on("close", () => log("Circuit breaker closed"));
 
-router.post("/readings", apiKeyAuth(GATEWAY_API_KEY), async (req, res) => {
+router.post("/readings", readingRateLimiter, apiKeyAuth(GATEWAY_API_KEY), async (req, res) => {
   try {
     const response = await breaker.fire({
       url: "/readings/create",
       method: "POST",
       headers: {
         "x-tenant-id": req.tenantId,
-        "x-internal-secret": INTERNAL_SECRET,
+        "x-internal-secret": INTERNAL_SECRET, 
       },
       data: req.body,
     });
