@@ -1,9 +1,14 @@
+require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const CircuitBreaker = require("opossum");
 
 const router = express.Router();
 const { log } = require("../utils/logger");
+const { apiKeyAuth } = require("../middlewares/apiKeyAuth");
+
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
 
 const READING_SERVICE_INSTANCES = [process.env.READING_SERVICE_1];
 
@@ -35,14 +40,18 @@ breaker.on("open", () => log("Circuit breaker opened"));
 breaker.on("halfOpen", () => log("Circuit breaker half-open"));
 breaker.on("close", () => log("Circuit breaker closed"));
 
-router.post("/readings", async (req, res) => {
+router.post("/readings", apiKeyAuth(GATEWAY_API_KEY), async (req, res) => {
   try {
     const response = await breaker.fire({
       url: "/readings/create",
       method: "POST",
-      headers: { "x-tenant-id": req.tenantId },
+      headers: {
+        "x-tenant-id": req.tenantId,
+        "x-internal-secret": INTERNAL_SECRET,
+      },
       data: req.body,
     });
+
     res.status(response.status).json(response.data);
   } catch (err) {
     res
